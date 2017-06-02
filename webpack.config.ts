@@ -164,6 +164,8 @@ let appChunkName = 'app', firstChunk = 'aurelia-bootstrap';
 
 let patterns = [{ from: 'favicon.ico', to: 'favicon.ico' }];
 
+let debugUglify = false;
+
 /**
  * Main Webpack Configuration
  */
@@ -285,7 +287,34 @@ let config = generateConfig(
         }
       ),
       // DevOrTest
-      new CopyWebpackPlugin(patterns, {})
+      new CopyWebpackPlugin(patterns, {}),
+      // Production   ENV === 'production'
+      new webpack.optimize.UglifyJsPlugin(debugUglify ? {
+        beautify: true, //debug
+        mangle: false, //debug
+        compress: {
+          screw_ie8: true,
+          keep_fnames: true,
+          drop_debugger: false,
+          dead_code: false,
+          unused: false
+        }, // debug
+        comments: true, //debug
+      } : {
+          beautify: false, //prod
+
+          mangle: { except: ['cb', '__webpack_require__'] }, //prod
+
+          exclude: [],
+
+          compress: {
+            screw_ie8: true,
+            warnings: false
+          }, //prod
+
+          comments: false //prod
+        }
+      ),
     ],
     metadata: {
       title,
@@ -295,17 +324,6 @@ let config = generateConfig(
       extractTextInstances
     }
   },
-
-  /**
-   * Don't be afraid, you can put bits of standard Webpack configuration here
-   * (or at the end, after the last parameter, so it won't get overwritten by the presets)
-   * Because that's all easy-webpack configs are - snippets of premade, maintained configuration parts!
-   *
-   * For Webpack docs, see: https://webpack.js.org/configuration/
-   */
-
-  ENV === 'production' ?
-    uglify({ debug: false, mangle: { except: ['cb', '__webpack_require__'] } }) : {}
 );
 
 module.exports = stripMetadata(config);
