@@ -25,6 +25,7 @@ import * as AureliaWebpackPlugin from 'aurelia-webpack-plugin';
 import { TsConfigPathsPlugin, CheckerPlugin } from 'awesome-typescript-loader';
 //import * as ExtractTextPlugin from 'extract-text-webpack-plugin';
 const ExtractTextPlugin = require('extract-text-webpack-plugin')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
 
 const ENV: 'development' | 'production' | 'test' = process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() || (process.env.NODE_ENV = 'development');
 
@@ -67,6 +68,8 @@ if (!providedInstance) {
     extractText = null
   }
 }
+
+let minify = ENV === 'production', overrideOptions = {};
 
 
 const coreBundles = {
@@ -155,7 +158,17 @@ let config = generateConfig(
       new AureliaWebpackPlugin(allOptions),
       new TsConfigPathsPlugin(options),
       new CheckerPlugin(),
-      extractText
+      extractText,
+      new HtmlWebpackPlugin(Object.assign({
+          template: 'index.html',
+          chunksSortMode: 'dependency',
+          minify: minify ? {
+            removeComments: true,
+            collapseWhitespace: true
+          } : undefined,
+          metadata: get(this, 'metadata', {})
+        }, overrideOptions)
+      )
     ],
     metadata: {
       title,
@@ -177,8 +190,6 @@ let config = generateConfig(
   ENV === 'test' || ENV === 'development' ?
     envDev(ENV !== 'test' ? {} : { devtool: 'inline-source-map' }) :
     envProd({ /* devtool: '...' */ }),
-
-  generateIndexHtml({ minify: ENV === 'production' }),
 
   ...(ENV === 'production' || ENV === 'development' ? [
     commonChunksOptimize({ appChunkName: 'app', firstChunk: 'aurelia-bootstrap' }),
