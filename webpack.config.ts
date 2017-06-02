@@ -23,6 +23,8 @@ import * as generateCoverage from '@easy-webpack/config-test-coverage-istanbul';
 
 import * as AureliaWebpackPlugin from 'aurelia-webpack-plugin';
 import { TsConfigPathsPlugin, CheckerPlugin } from 'awesome-typescript-loader';
+//import * as ExtractTextPlugin from 'extract-text-webpack-plugin';
+const ExtractTextPlugin = require('extract-text-webpack-plugin')
 
 const ENV: 'development' | 'production' | 'test' = process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() || (process.env.NODE_ENV = 'development');
 
@@ -35,6 +37,37 @@ const outDir = path.resolve('dist');
 
 const allOptions = { root: rootDir, src: srcDir, title: title, baseUrl: baseUrl };
 const options = ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } };
+
+
+let filename = 'styles.css', allChunks = true, sourceMap = false;
+let extractText: any = undefined, resolveRelativeUrl = undefined, additionalLoaders = [], test = /\.css$/i
+const loaders = ['style-loader', `css-loader${sourceMap ? '?sourceMap' : ''}`]
+
+if (resolveRelativeUrl) {
+  loaders.push(`resolve-url-loader${sourceMap ? '?sourceMap' : ''}`)
+  sourceMap = true // source maps need to be on for this
+}
+
+if (additionalLoaders) {
+  loaders.push(...additionalLoaders)
+}
+
+const extractCss = extractText !== false
+const providedInstance = extractText instanceof ExtractTextPlugin
+const extractTextInstances: Map<string, any> = new Map()
+
+if (!providedInstance) {
+  if (extractCss) {
+    extractText = extractTextInstances.get(filename)
+    if (!extractText) {
+      extractText = new ExtractTextPlugin(extractText instanceof Object ? extractText : { filename, allChunks })
+      extractTextInstances.set(filename, extractText)
+    }
+  } else {
+    extractText = null
+  }
+}
+
 
 const coreBundles = {
   bootstrap: [
@@ -104,19 +137,27 @@ let config = generateConfig(
           loader: 'awesome-typescript-loader',
           exclude: null || (rootDir ? [path.join(rootDir, 'node_modules')] : []),
           options
+        },
+        {
+          test,
+          use: extractCss ?
+            extractText.extract({ fallback: loaders[0], use: loaders.slice(1) }) :
+            loaders
         }
       ]
     },
     plugins: [
       new AureliaWebpackPlugin(allOptions),
       new TsConfigPathsPlugin(options),
-      new CheckerPlugin()
+      new CheckerPlugin(),
+      extractText
     ],
     metadata: {
       title,
       baseUrl,
       rootDir,
       srcDir,
+      extractTextInstances
     }
   },
 
@@ -132,7 +173,6 @@ let config = generateConfig(
     envDev(ENV !== 'test' ? {} : { devtool: 'inline-source-map' }) :
     envProd({ /* devtool: '...' */ }),
 
-  css({ filename: 'styles.css', allChunks: true, sourceMap: false }),
   fontAndImages(),
   generateIndexHtml({ minify: ENV === 'production' }),
 
