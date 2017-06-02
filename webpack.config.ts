@@ -124,8 +124,6 @@ let config = generateConfig(
   typescript(ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } }),
   css({ filename: 'styles.css', allChunks: true, sourceMap: false }),
   fontAndImages(),
-  globalBluebird(),
-  globalJquery(),
   generateIndexHtml({ minify: ENV === 'production' }),
 
   ...(ENV === 'production' || ENV === 'development' ? [
