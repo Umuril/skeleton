@@ -169,161 +169,152 @@ let debugUglify = false;
 /**
  * Main Webpack Configuration
  */
-let config = generateConfig(
-  {
-    devtool: DevOrProd ? DevOrTestDevTool : 'source-map',
-    entry: {
-      'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
-      'aurelia-bootstrap': coreBundles.bootstrap,
-      'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
-    },
-    output: {
-      path: outDir,
-      filename: DevOrProd ? '[name].bundle.js' : '[name].[chunkhash].bundle.js',
-      sourceMapFilename: DevOrProd ? '[name].bundle.map' : '[name].[chunkhash].bundle.map',
-      chunkFilename: DevOrProd ? '[id].chunk.js' : '[id].[chunkhash].chunk.js'
-    },
-    resolve: {
-      modules: [
-        srcDir,
-        'node_modules'
-      ],
-      extensions: ['.js', '.tsx', '.ts']
-    },
-    module: {
-      rules: [
-        {
-          test: /\.html$/,
-          loader: 'html-loader',
-          exclude: null || (rootDir ? [path.join(rootDir, 'index.html')] : [])
+module.exports = {
+  devtool: DevOrProd ? DevOrTestDevTool : 'source-map',
+  entry: {
+    'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
+    'aurelia-bootstrap': coreBundles.bootstrap,
+    'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
+  },
+  output: {
+    path: outDir,
+    filename: DevOrProd ? '[name].bundle.js' : '[name].[chunkhash].bundle.js',
+    sourceMapFilename: DevOrProd ? '[name].bundle.map' : '[name].[chunkhash].bundle.map',
+    chunkFilename: DevOrProd ? '[id].chunk.js' : '[id].[chunkhash].chunk.js'
+  },
+  resolve: {
+    modules: [
+      srcDir,
+      'node_modules'
+    ],
+    extensions: ['.js', '.tsx', '.ts']
+  },
+  module: {
+    rules: [
+      {
+        test: /\.html$/,
+        loader: 'html-loader',
+        exclude: null || (rootDir ? [path.join(rootDir, 'index.html')] : [])
+      },
+      {
+        test: /\.tsx?$/,
+        loader: 'awesome-typescript-loader',
+        exclude: null || (rootDir ? [path.join(rootDir, 'node_modules')] : []),
+        options
+      },
+      {
+        test,
+        use: extractCss ?
+          extractText.extract({ fallback: loaders[0], use: loaders.slice(1) }) :
+          loaders
+      },
+      // embed small images and fonts as Data Urls and larger ones as files
+      { test: /\.(png|gif|jpg|cur)$/, loader: 'url-loader', query: { limit: 8192 } },
+      { test: /\.woff2(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff2' } },
+      { test: /\.woff(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff' } },
+      { test: /\.(ttf|eot|svg|otf)(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'file-loader' },
+      // ! DevOrTest config-test-coverage-istanbul
+      /*{
+        test: /\.(js|ts)$/,
+        loader: 'sourcemap-istanbul-instrumenter-loader',
+        query: {
+          esModules: true
         },
+        enforce: 'post',
+        include: include || metadata.src,
+        exclude: exclude || (metadata.root ? [path.join(metadata.root, 'node_modules')] : []),
+      }*/
+    ]
+  },
+  devServer,
+  plugins: [
+    new AureliaWebpackPlugin(allOptions),
+    /*, Need to solve
+    ...!DevOrProd && new WebpackMd5Hash(),
+    ...!DevOrProd && new (webpack as any).LoaderOptionsPlugin({
+      options: Object.assign({}, DefaultHtmlLoaderOptions, loaderOptions)
+    }),*/
+    new TsConfigPathsPlugin(options),
+    new CheckerPlugin(),
+    extractText,
+    new HtmlWebpackPlugin(
+      Object.assign(
         {
-          test: /\.tsx?$/,
-          loader: 'awesome-typescript-loader',
-          exclude: null || (rootDir ? [path.join(rootDir, 'node_modules')] : []),
-          options
+          template: 'index.html',
+          chunksSortMode: 'dependency',
+          minify: minify ? {
+            removeComments: true,
+            collapseWhitespace: true
+          } : undefined,
+          metadata: get(this, 'metadata', {})
         },
-        {
-          test,
-          use: extractCss ?
-            extractText.extract({ fallback: loaders[0], use: loaders.slice(1) }) :
-            loaders
-        },
-        // embed small images and fonts as Data Urls and larger ones as files
-        { test: /\.(png|gif|jpg|cur)$/, loader: 'url-loader', query: { limit: 8192 } },
-        { test: /\.woff2(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff2' } },
-        { test: /\.woff(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff' } },
-        { test: /\.(ttf|eot|svg|otf)(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'file-loader' },
-        // ! DevOrTest config-test-coverage-istanbul
-        /*{
-          test: /\.(js|ts)$/,
-          loader: 'sourcemap-istanbul-instrumenter-loader',
-          query: {
-            esModules: true
-          },
-          enforce: 'post',
-          include: include || metadata.src,
-          exclude: exclude || (metadata.root ? [path.join(metadata.root, 'node_modules')] : []),
-        }*/
-      ]
-    },
-    devServer,
-    plugins: [
-      new AureliaWebpackPlugin(allOptions),
-      /*, Need to solve
-      ...!DevOrProd && new WebpackMd5Hash(),
-      ...!DevOrProd && new (webpack as any).LoaderOptionsPlugin({
-        options: Object.assign({}, DefaultHtmlLoaderOptions, loaderOptions)
-      }),*/
-      new TsConfigPathsPlugin(options),
-      new CheckerPlugin(),
-      extractText,
-      new HtmlWebpackPlugin(
-        Object.assign(
-          {
-            template: 'index.html',
-            chunksSortMode: 'dependency',
-            minify: minify ? {
-              removeComments: true,
-              collapseWhitespace: true
-            } : undefined,
-            metadata: get(this, 'metadata', {})
-          },
-          overrideOptions
-        )
-      ),
-      DevOrProd ? new DefinePlugin({
-        '__DEV__': true,
+        overrideOptions
+      )
+    ),
+    DevOrProd ? new DefinePlugin({
+      '__DEV__': true,
+      'ENV': JSON.stringify(metadata.ENV),
+      'HMR': metadata.HMR,
+      'process.env': {
         'ENV': JSON.stringify(metadata.ENV),
+        'NODE_ENV': JSON.stringify(metadata.ENV),
         'HMR': metadata.HMR,
-        'process.env': {
-          'ENV': JSON.stringify(metadata.ENV),
-          'NODE_ENV': JSON.stringify(metadata.ENV),
-          'HMR': metadata.HMR,
-          'WEBPACK_HOST': JSON.stringify(metadata.host),
-          'WEBPACK_PORT': JSON.stringify(metadata.port)
-        }
-      }) : new webpack.DefinePlugin({
-        '__DEV__': false,
+        'WEBPACK_HOST': JSON.stringify(metadata.host),
+        'WEBPACK_PORT': JSON.stringify(metadata.port)
+      }
+    }) : new webpack.DefinePlugin({
+      '__DEV__': false,
+      'ENV': JSON.stringify(metadata.ENV),
+      'HMR': metadata.HMR,
+      'process.env': {
         'ENV': JSON.stringify(metadata.ENV),
+        'NODE_ENV': JSON.stringify(metadata.ENV),
         'HMR': metadata.HMR,
-        'process.env': {
-          'ENV': JSON.stringify(metadata.ENV),
-          'NODE_ENV': JSON.stringify(metadata.ENV),
-          'HMR': metadata.HMR,
-        }
-      }),
-      // DevOrTest
-      new webpack.optimize.CommonsChunkPlugin(
-        {
-          name: [
-            firstChunk,
-            ...Object.keys({
-              'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
-              'aurelia-bootstrap': coreBundles.bootstrap,
-              'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
-            } || {}).filter(entry => entry !== appChunkName && entry !== firstChunk)
-          ].reverse()
-        }
-      ),
-      // DevOrTest
-      new CopyWebpackPlugin(patterns, {}),
-      // Production   ENV === 'production'
-      new webpack.optimize.UglifyJsPlugin(debugUglify ? {
-        beautify: true, //debug
-        mangle: false, //debug
+      }
+    }),
+    // DevOrTest
+    new webpack.optimize.CommonsChunkPlugin(
+      {
+        name: [
+          firstChunk,
+          ...Object.keys({
+            'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
+            'aurelia-bootstrap': coreBundles.bootstrap,
+            'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
+          } || {}).filter(entry => entry !== appChunkName && entry !== firstChunk)
+        ].reverse()
+      }
+    ),
+    // DevOrTest
+    new CopyWebpackPlugin(patterns, {}),
+    // Production   ENV === 'production'
+    new webpack.optimize.UglifyJsPlugin(debugUglify ? {
+      beautify: true, //debug
+      mangle: false, //debug
+      compress: {
+        screw_ie8: true,
+        keep_fnames: true,
+        drop_debugger: false,
+        dead_code: false,
+        unused: false
+      }, // debug
+      comments: true, //debug
+    } : {
+        beautify: false, //prod
+
+        mangle: { except: ['cb', '__webpack_require__'] }, //prod
+
+        exclude: [],
+
         compress: {
           screw_ie8: true,
-          keep_fnames: true,
-          drop_debugger: false,
-          dead_code: false,
-          unused: false
-        }, // debug
-        comments: true, //debug
-      } : {
-          beautify: false, //prod
+          warnings: false
+        }, //prod
 
-          mangle: { except: ['cb', '__webpack_require__'] }, //prod
+        comments: false //prod
+      }
+    ),
+  ]
+};
 
-          exclude: [],
-
-          compress: {
-            screw_ie8: true,
-            warnings: false
-          }, //prod
-
-          comments: false //prod
-        }
-      ),
-    ],
-    metadata: {
-      title,
-      baseUrl,
-      rootDir,
-      srcDir,
-      extractTextInstances
-    }
-  },
-);
-
-module.exports = stripMetadata(config);
+//module.exports = stripMetadata(config);
