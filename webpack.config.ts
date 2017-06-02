@@ -89,6 +89,15 @@ let config = generateConfig(
         'node_modules'
       ],
     },
+    module: {
+      rules: [
+        {
+          test: /\.html$/,
+          loader: 'html-loader',
+          exclude: null || (rootDir ? [path.join(rootDir, 'index.html')] : [])
+        }
+      ]
+    },
     plugins: [
       new AureliaWebpackPlugin(allOptions)
     ],
@@ -113,7 +122,6 @@ let config = generateConfig(
     envProd({ /* devtool: '...' */ }),
 
   typescript(ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } }),
-  html(),
   css({ filename: 'styles.css', allChunks: true, sourceMap: false }),
   fontAndImages(),
   globalBluebird(),
