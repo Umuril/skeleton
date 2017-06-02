@@ -23,9 +23,11 @@ import * as generateCoverage from '@easy-webpack/config-test-coverage-istanbul';
 
 import * as AureliaWebpackPlugin from 'aurelia-webpack-plugin';
 import { TsConfigPathsPlugin, CheckerPlugin } from 'awesome-typescript-loader';
-//import * as ExtractTextPlugin from 'extract-text-webpack-plugin';
 const ExtractTextPlugin = require('extract-text-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const WebpackMd5Hash = require('webpack-md5-hash')
+const DefinePlugin = require('webpack/lib/DefinePlugin')
+import * as webpack from 'webpack'
 
 const ENV: 'development' | 'production' | 'test' = process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() || (process.env.NODE_ENV = 'development');
 
@@ -38,6 +40,10 @@ const outDir = path.resolve('dist');
 
 const allOptions = { root: rootDir, src: srcDir, title: title, baseUrl: baseUrl };
 const options = ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } };
+
+function hasProcessFlag(flag) {
+  return process.argv.join('').indexOf(flag) > -1
+}
 
 
 let filename = 'styles.css', allChunks = true, sourceMap = false;
@@ -71,6 +77,25 @@ if (!providedInstance) {
 
 let minify = ENV === 'production', overrideOptions = {};
 
+const DefaultHtmlLoaderOptions = {
+  htmlLoader: {
+    minimize: true,
+    removeAttributeQuotes: false,
+    caseSensitive: true,
+    // customAttrSurround: [
+    //   [/#/, /(?:)/],
+    //   [/\*/, /(?:)/],
+    //   [/\[?\(?/, /(?:)/]
+    // ],
+    // customAttrAssign: [/\)?\]?=/]
+  }
+} as any
+
+let DevOrProd = ENV === 'test' || ENV === 'development'
+
+let DevOrTest = ENV !== 'test' ? 'cheap-module-inline-source-map' : 'inline-source-map';
+
+let derupe = false, loaderOptions = {};
 
 const coreBundles = {
   bootstrap: [
@@ -108,11 +133,36 @@ const coreBundles = {
   ]
 }
 
+let metadata = {
+  title,
+  baseUrl,
+  rootDir,
+  srcDir,
+  extractTextInstances,
+  port: parseInt(process.env.WEBPACK_PORT) || 9000,
+  host: process.env.WEBPACK_HOST || 'localhost',
+  ENV: process.env.NODE_ENV || process.env.ENV || 'development',
+  HMR: hasProcessFlag('hot') || !!process.env.WEBPACK_HMR,
+}
+
+
+// Need to solve undefined
+let devServer = DevOrProd ? {
+  port: metadata.port,
+  host: metadata.host,
+  historyApiFallback: true,
+  watchOptions: {
+    aggregateTimeout: 300,
+    poll: 1000
+  }
+} : undefined;
+
 /**
  * Main Webpack Configuration
  */
 let config = generateConfig(
   {
+    devtool: DevOrProd ? DevOrTest : 'source-map',
     entry: {
       'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
       'aurelia-bootstrap': coreBundles.bootstrap,
@@ -120,6 +170,9 @@ let config = generateConfig(
     },
     output: {
       path: outDir,
+      filename: DevOrProd ? '[name].bundle.js' : '[name].[chunkhash].bundle.js',
+      sourceMapFilename: DevOrProd ? '[name].bundle.map' : '[name].[chunkhash].bundle.map',
+      chunkFilename: DevOrProd ? '[id].chunk.js' : '[id].[chunkhash].chunk.js'
     },
     resolve: {
       modules: [
@@ -154,21 +207,52 @@ let config = generateConfig(
         { test: /\.(ttf|eot|svg|otf)(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'file-loader' },
       ]
     },
+    //devServer,
     plugins: [
       new AureliaWebpackPlugin(allOptions),
+      /*, Need to solve
+      ...!DevOrProd && new WebpackMd5Hash(),
+      ...!DevOrProd && new (webpack as any).LoaderOptionsPlugin({
+        options: Object.assign({}, DefaultHtmlLoaderOptions, loaderOptions)
+      }),*/
       new TsConfigPathsPlugin(options),
       new CheckerPlugin(),
       extractText,
-      new HtmlWebpackPlugin(Object.assign({
-          template: 'index.html',
-          chunksSortMode: 'dependency',
-          minify: minify ? {
-            removeComments: true,
-            collapseWhitespace: true
-          } : undefined,
-          metadata: get(this, 'metadata', {})
-        }, overrideOptions)
-      )
+      new HtmlWebpackPlugin(
+        Object.assign(
+          {
+            template: 'index.html',
+            chunksSortMode: 'dependency',
+            minify: minify ? {
+              removeComments: true,
+              collapseWhitespace: true
+            } : undefined,
+            metadata: get(this, 'metadata', {})
+          },
+          overrideOptions
+        )
+      ),
+      DevOrProd ? new DefinePlugin({
+        '__DEV__': true,
+        'ENV': JSON.stringify(metadata.ENV),
+        'HMR': metadata.HMR,
+        'process.env': {
+          'ENV': JSON.stringify(metadata.ENV),
+          'NODE_ENV': JSON.stringify(metadata.ENV),
+          'HMR': metadata.HMR,
+          'WEBPACK_HOST': JSON.stringify(metadata.host),
+          'WEBPACK_PORT': JSON.stringify(metadata.port)
+        }
+      }) : new webpack.DefinePlugin({
+        '__DEV__': false,
+        'ENV': JSON.stringify(metadata.ENV),
+        'HMR': metadata.HMR,
+        'process.env': {
+          'ENV': JSON.stringify(metadata.ENV),
+          'NODE_ENV': JSON.stringify(metadata.ENV),
+          'HMR': metadata.HMR,
+        }
+      })
     ],
     metadata: {
       title,
@@ -186,10 +270,6 @@ let config = generateConfig(
    *
    * For Webpack docs, see: https://webpack.js.org/configuration/
    */
-
-  ENV === 'test' || ENV === 'development' ?
-    envDev(ENV !== 'test' ? {} : { devtool: 'inline-source-map' }) :
-    envProd({ /* devtool: '...' */ }),
 
   ...(ENV === 'production' || ENV === 'development' ? [
     commonChunksOptimize({ appChunkName: 'app', firstChunk: 'aurelia-bootstrap' }),
