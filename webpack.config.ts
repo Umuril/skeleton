@@ -22,6 +22,7 @@ import * as uglify from '@easy-webpack/config-uglify';
 import * as generateCoverage from '@easy-webpack/config-test-coverage-istanbul';
 
 import * as AureliaWebpackPlugin from 'aurelia-webpack-plugin';
+import { TsConfigPathsPlugin, CheckerPlugin } from 'awesome-typescript-loader';
 
 const ENV: 'development' | 'production' | 'test' = process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() || (process.env.NODE_ENV = 'development');
 
@@ -33,6 +34,7 @@ const srcDir = path.resolve('src');
 const outDir = path.resolve('dist');
 
 const allOptions = { root: rootDir, src: srcDir, title: title, baseUrl: baseUrl };
+const options = ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } };
 
 const coreBundles = {
   bootstrap: [
@@ -88,6 +90,7 @@ let config = generateConfig(
         srcDir,
         'node_modules'
       ],
+      extensions: ['.js', '.tsx', '.ts']
     },
     module: {
       rules: [
@@ -95,11 +98,19 @@ let config = generateConfig(
           test: /\.html$/,
           loader: 'html-loader',
           exclude: null || (rootDir ? [path.join(rootDir, 'index.html')] : [])
+        },
+        {
+          test: /\.tsx?$/,
+          loader: 'awesome-typescript-loader',
+          exclude: null || (rootDir ? [path.join(rootDir, 'node_modules')] : []),
+          options
         }
       ]
     },
     plugins: [
-      new AureliaWebpackPlugin(allOptions)
+      new AureliaWebpackPlugin(allOptions),
+      new TsConfigPathsPlugin(options),
+      new CheckerPlugin()
     ],
     metadata: {
       title,
@@ -121,7 +132,6 @@ let config = generateConfig(
     envDev(ENV !== 'test' ? {} : { devtool: 'inline-source-map' }) :
     envProd({ /* devtool: '...' */ }),
 
-  typescript(ENV !== 'test' ? {} : { options: { doTypeCheck: false, sourceMap: false, inlineSourceMap: true, inlineSources: true } }),
   css({ filename: 'styles.css', allChunks: true, sourceMap: false }),
   fontAndImages(),
   generateIndexHtml({ minify: ENV === 'production' }),
