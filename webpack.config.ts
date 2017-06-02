@@ -28,6 +28,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 const WebpackMd5Hash = require('webpack-md5-hash')
 const DefinePlugin = require('webpack/lib/DefinePlugin')
 import * as webpack from 'webpack'
+const CopyWebpackPlugin = require('copy-webpack-plugin')
 
 const ENV: 'development' | 'production' | 'test' = process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() || (process.env.NODE_ENV = 'development');
 
@@ -93,7 +94,9 @@ const DefaultHtmlLoaderOptions = {
 
 let DevOrProd = ENV === 'test' || ENV === 'development'
 
-let DevOrTest = ENV !== 'test' ? 'cheap-module-inline-source-map' : 'inline-source-map';
+let DevOrTestDevTool = ENV !== 'test' ? 'cheap-module-inline-source-map' : 'inline-source-map';
+
+let DevOrTest = ENV === 'production' || ENV === 'development';
 
 let derupe = false, loaderOptions = {};
 
@@ -157,12 +160,16 @@ let devServer = DevOrProd ? {
   }
 } : undefined;
 
+let appChunkName = 'app', firstChunk = 'aurelia-bootstrap';
+
+let patterns = [{ from: 'favicon.ico', to: 'favicon.ico' }];
+
 /**
  * Main Webpack Configuration
  */
 let config = generateConfig(
   {
-    devtool: DevOrProd ? DevOrTest : 'source-map',
+    devtool: DevOrProd ? DevOrTestDevTool : 'source-map',
     entry: {
       'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
       'aurelia-bootstrap': coreBundles.bootstrap,
@@ -205,9 +212,20 @@ let config = generateConfig(
         { test: /\.woff2(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff2' } },
         { test: /\.woff(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'url-loader', query: { limit: 10000, mimetype: 'application/font-woff' } },
         { test: /\.(ttf|eot|svg|otf)(\?v=[0-9]\.[0-9]\.[0-9])?$/, loader: 'file-loader' },
+        // ! DevOrTest config-test-coverage-istanbul
+        /*{
+          test: /\.(js|ts)$/,
+          loader: 'sourcemap-istanbul-instrumenter-loader',
+          query: {
+            esModules: true
+          },
+          enforce: 'post',
+          include: include || metadata.src,
+          exclude: exclude || (metadata.root ? [path.join(metadata.root, 'node_modules')] : []),
+        }*/
       ]
     },
-    //devServer,
+    devServer,
     plugins: [
       new AureliaWebpackPlugin(allOptions),
       /*, Need to solve
@@ -252,7 +270,22 @@ let config = generateConfig(
           'NODE_ENV': JSON.stringify(metadata.ENV),
           'HMR': metadata.HMR,
         }
-      })
+      }),
+      // DevOrTest
+      new webpack.optimize.CommonsChunkPlugin(
+        {
+          name: [
+            firstChunk,
+            ...Object.keys({
+              'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
+              'aurelia-bootstrap': coreBundles.bootstrap,
+              'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
+            } || {}).filter(entry => entry !== appChunkName && entry !== firstChunk)
+          ].reverse()
+        }
+      ),
+      // DevOrTest
+      new CopyWebpackPlugin(patterns, {})
     ],
     metadata: {
       title,
@@ -270,14 +303,6 @@ let config = generateConfig(
    *
    * For Webpack docs, see: https://webpack.js.org/configuration/
    */
-
-  ...(ENV === 'production' || ENV === 'development' ? [
-    commonChunksOptimize({ appChunkName: 'app', firstChunk: 'aurelia-bootstrap' }),
-    copyFiles({ patterns: [{ from: 'favicon.ico', to: 'favicon.ico' }] })
-  ] : [
-      /* ENV === 'test' */
-      generateCoverage({ options: { esModules: true } })
-    ]),
 
   ENV === 'production' ?
     uglify({ debug: false, mangle: { except: ['cb', '__webpack_require__'] } }) : {}
