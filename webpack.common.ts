@@ -251,7 +251,7 @@ module.exports = {
         overrideOptions
       )
     ),
-    DevOrProd ? new DefinePlugin({
+    /*DevOrProd ? new DefinePlugin({
       '__DEV__': true,
       'ENV': JSON.stringify(metadata.ENV),
       'HMR': metadata.HMR,
@@ -271,22 +271,7 @@ module.exports = {
         'NODE_ENV': JSON.stringify(metadata.ENV),
         'HMR': metadata.HMR,
       }
-    }),
-    // DevOrTest
-    new webpack.optimize.CommonsChunkPlugin(
-      {
-        name: [
-          firstChunk,
-          ...Object.keys({
-            'app': ['./src/main' /* this is filled by the aurelia-webpack-plugin */],
-            'aurelia-bootstrap': coreBundles.bootstrap,
-            'aurelia': coreBundles.aurelia.filter(pkg => coreBundles.bootstrap.indexOf(pkg) === -1)
-          } || {}).filter(entry => entry !== appChunkName && entry !== firstChunk)
-        ].reverse()
-      }
-    ),
-    // DevOrTest
-    new CopyWebpackPlugin(patterns, {}),
+    }),*/
     // Production   ENV === 'production'
     new webpack.optimize.UglifyJsPlugin(debugUglify ? {
       beautify: true, //debug
